@@ -10,6 +10,10 @@
     <TargetFramework>net6.0-windows</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SocketIOClient" Version="3.0.6" />
+    <PackageReference Include="SocketIOClient.Newtonsoft.Json" Version="3.0.0" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\Source\NDde\NDde.csproj" />
   </ItemGroup>
 </Project>
