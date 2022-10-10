@@ -12,7 +12,9 @@ using SocketIOClient.Newtonsoft.Json;
 using Transport = SocketIOClient.Transport;
 using System.Xml.Linq;
 using Newtonsoft.Json;
+using Microsoft.VisualBasic;
 //using System.Text.Json.Serialization;
+
 
 namespace Server
 {
@@ -21,10 +23,20 @@ namespace Server
         public long time;
         public string symbol;
         public double price;
-        public long volume;
+        private long _volume;
+        public long volume {
+            get
+            {
+                return _volume;
+            }
+            set
+            {
+                _volume = Math.Max(value, 1);
+            }
+        }
         public int digits;
 
-        public string Price => price.ToString("F" + digits);
+        public string Price => price.ToString();//"F" + digits);
         public string Volume => volume.ToString();
         public DateTime Time => DateTime.FromBinary(time);
     }
@@ -41,18 +53,20 @@ namespace Server
         //    }
         //}
         private static Dictionary<string, Tick> _lastTicks = new Dictionary<string, Tick>();
-        public static async Task Main(string[] args)
+        private const int PORT = 11003;
+        private const string SERVER_NAME = "VN1";
+        public static void Main(string[] args)
         {            
             // Show Debug and Trace messages
             Console.OutputEncoding = Encoding.UTF8;
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
 
-            var uri = new Uri("http://localhost:11003/");
+            var uri = new Uri("http://localhost:" + PORT);
 
             var socket = new SocketIO(uri
             , new SocketIOOptions
-              {
-                  Transport = Transport.TransportProtocol.WebSocket,
+            {
+                Transport = Transport.TransportProtocol.WebSocket,
                 AutoUpgrade = true,
                 EIO = 4
                 //  Query = new Dictionary<string, string>
@@ -60,18 +74,7 @@ namespace Server
                 //    {"token", "V3" }
                 //},
             });
-            //var uri = new Uri("http://localhost:11002/");
 
-            //var socket = new SocketIO(uri, new SocketIOOptions
-            //{
-            //    Transport = Transport.TransportProtocol.Polling,
-            //    AutoUpgrade = false,
-            //    EIO = 3,
-            //    Query = new Dictionary<string, string>
-            //    {
-            //        {"token", "V2" }
-            //    },
-            //});
 
             socket.OnConnected += Socket_OnConnected;
             //socket.OnPing += Socket_OnPing;
@@ -88,15 +91,19 @@ namespace Server
             //Console.WriteLine("Press any key to continue");
             //Console.ReadLine();
 
-            //await
+            ////await
             socket.ConnectAsync();
+            
             try
             {
                 // Create a server that will register the service name 'myapp'.
-                _server = new MyServer("VNI");
+                _server = new MyServer(SERVER_NAME);
                 _server.Register();
                 // Register the service name.                    
                 // Wait for the user to press ENTER before proceding.
+                Console.WriteLine("DDE SERVER RUNNING WITH NAME: " + SERVER_NAME);
+                Console.WriteLine("DDE SERVER RUNNING ON PORT: " + PORT);                
+                Console.WriteLine("DDE SERVER RUNNING WITH TOPIC: [Price] [Volume]");
                 Console.WriteLine("Press ENTER to quit...");
                 Console.ReadLine();
             }
@@ -119,8 +126,9 @@ namespace Server
             var jsonString = response.GetValue().ToString();
             var tick = JsonConvert.DeserializeObject<Tick>(jsonString);
             //Console.WriteLine("tick: " + JsonConvert.SerializeObject(tick));
-            Console.WriteLine("tick: " + tick.symbol);
-            Console.WriteLine("tick: " + jsonString);
+            //Console.WriteLine("tick: " + tick.symbol);
+            //tick.symbol = tick.symbol;
+            Console.WriteLine("Tick Received: " + jsonString);
             if (name != tick.symbol) return;
             _server.TickReceived(tick);
             //long time = 
@@ -169,21 +177,21 @@ namespace Server
         }
         private sealed class MyServer : DdeServer
         {
-            //private System.Timers.Timer _Timer = new System.Timers.Timer();
+            private System.Timers.Timer _Timer = new System.Timers.Timer();
 
             public MyServer(string service) : base(service)
             {
                 // Create a timer that will be used to advise clients of new data.
-                //_Timer.Elapsed += this.OnTimerElapsed;
-                //_Timer.Interval = 1000;
-                //_Timer.SynchronizingObject = this.Context;                
+                _Timer.Elapsed += this.OnTimerElapsed;
+                _Timer.Interval = 1000;
+                _Timer.SynchronizingObject = this.Context;
             }
 
-            //private void OnTimerElapsed(object sender, ElapsedEventArgs args)
-            //{
-            //    // Advise all topic name and item name pairs.
-            //    Advise("*", "*");
-            //}
+            private void OnTimerElapsed(object sender, ElapsedEventArgs args)
+            {
+                // Advise all topic name and item name pairs.
+                //Advise("*", "*");
+            }
 
             public void TickReceived(Tick tick)//long time, string symbol, double price, long volume, int digits=2)
             {
@@ -194,9 +202,10 @@ namespace Server
                 //tick.price = price;
                 //tick.volume = volume;
                 //tick.digits = digits;
-                Console.WriteLine(tick.symbol);
-                Console.WriteLine(tick.price);
-                //if (!_lastTicks.ContainsKey(tick.symbol) || tick.time > _lastTicks[tick.symbol].time)
+                //Console.WriteLine(tick.symbol);
+                //Console.WriteLine(tick.price);
+                if (!_lastTicks.ContainsKey(tick.symbol)) _lastTicks.Add(tick.symbol, tick);
+                if (_lastTicks.ContainsKey(tick.symbol) && tick.time > _lastTicks[tick.symbol].time)
                 {
                     _lastTicks[tick.symbol] = tick;
                     //Advise("Price", tick.symbol);
@@ -209,12 +218,12 @@ namespace Server
             public override void Register()
             {
                 base.Register();
-                //_Timer.Start();
+                _Timer.Start();
             }
 
             public override void Unregister()
             {
-                //_Timer.Stop();
+                _Timer.Stop();
                 base.Unregister();
             }
 
@@ -253,7 +262,8 @@ namespace Server
                     + " Format=" + format.ToString());
 
                 // Initiate the advisory loop only if the format is CF_TEXT.
-                return format == 1;
+                //return format == 1;
+                return true;
             }
 
             protected override void OnStopAdvise(DdeConversation conversation, string item)
@@ -299,28 +309,42 @@ namespace Server
                     + " Handle=" + conversation.Handle.ToString()
                     + " Item='" + item + "'"
                     + " Format=" + format.ToString());
-
+                var symbol = conversation.Topic;
+                var type = item;
+                Console.WriteLine("Last Ticks Count: " + _lastTicks.Count);
                 // Return data to the client only if the format is CF_TEXT.
-                if (_lastTicks.ContainsKey(item))
+                foreach (var t in _lastTicks)
                 {
-                    //var Price = BitConverter.GetBytes(_lastTicks[item].price);//price.ToString("F" + _lastTicks[item].digits);
-                    //var Volume = BitConverter.GetBytes(_lastTicks[item].volume);//volume.ToString();
-                    //public DateTime Time => DateTime.FromBinary(time);
-                    var Price = System.Text.Encoding.ASCII.GetBytes(_lastTicks[item].Price);
-                    var Volume = System.Text.Encoding.ASCII.GetBytes(_lastTicks[item].Volume);
-                    Console.WriteLine(_lastTicks[item].Price + " " + _lastTicks[item].Volume);
-                    if (conversation.Topic == "Price")
-                        return new RequestResult(Price);
-                    if (conversation.Topic == "Volume")
-                        return new RequestResult(Volume);
+                    Console.WriteLine(t.Key + " " + t.Value);
+                    if (t.Key == symbol)
+                    {
+                        //var Price = BitConverter.GetBytes(_lastTicks[item].price);//price.ToString("F" + _lastTicks[item].digits);
+                        //var Volume = BitConverter.GetBytes(_lastTicks[item].volume);//volume.ToString();
+                        //public DateTime Time => DateTime.FromBinary(time);                    
+                        var Price = Encoding.ASCII.GetBytes(t.Value.Price);
+                        var Volume = Encoding.ASCII.GetBytes(t.Value.Volume);
+                        Console.WriteLine(symbol + " - " + type + " - " + t.Value.Price + " - " + t.Value.Volume);
+                        if (type.Contains("Price"))
+                        {
+                            Console.WriteLine("Return Price");
+                            return new RequestResult(Price);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Return Volume");
+                            return new RequestResult(Volume);
+                        }
+                        //return new RequestResult(Price);
+                    }
                 }
                 //   if (format == 1)
                 //{
                 //    return new RequestResult(System.Text.Encoding.ASCII.GetBytes("Time=" + DateTime.Now.ToString() + "\0"));
                 //}
+                return new RequestResult(Encoding.ASCII.GetBytes(test.ToString()));
                 return RequestResult.NotProcessed;
             }
-
+            float test = 1000.0f;
             protected override byte[] OnAdvise(string topic, string item, int format)
             {
                 Console.WriteLine("OnAdvise:".PadRight(16)
@@ -328,22 +352,38 @@ namespace Server
                     + " Topic='" + topic + "'"
                     + " Item='" + item + "'"
                     + " Format=" + format.ToString());
-
-                // Send data to the client only if the format is CF_TEXT.
-                if (_lastTicks.ContainsKey(item))
+                var symbol = topic;
+                var type = item;
+                Console.WriteLine("Last Ticks Count: " + _lastTicks.Count);
+                // Send data to the client only if the format is CF_TEXT.                
+                foreach (var t in _lastTicks)
                 {
-                    //var Price = BitConverter.GetBytes(_lastTicks[item].price);//price.ToString("F" + _lastTicks[item].digits);
-                    //var Volume = BitConverter.GetBytes(_lastTicks[item].volume);//volume.ToString();
-                    var Price = System.Text.Encoding.ASCII.GetBytes(_lastTicks[item].Price);
-                    var Volume = System.Text.Encoding.ASCII.GetBytes(_lastTicks[item].Volume);
-                    //public DateTime Time => DateTime.FromBinary(time);
-                    Console.WriteLine(_lastTicks[item].Price + " " + _lastTicks[item].Volume);
-                    if (topic == "Price")
-                        return Price;
-                    if (topic == "Volume")
-                        return Volume;
-                    //return System.Text.Encoding.ASCII.GetBytes("Time=" + DateTime.Now.ToString() + "\0");
+                    Console.WriteLine(t.Key + " " + t.Value);
+                    if (t.Key == symbol)
+                    {
+                        //var Price = BitConverter.GetBytes(_lastTicks[symbol].price);//price.ToString("F" + _lastTicks[symbol].digits);
+                        //var Volume = BitConverter.GetBytes(_lastTicks[symbol].volume);//volume.ToString();
+                        var Price = Encoding.ASCII.GetBytes(_lastTicks[symbol].Price);
+                        var Volume = Encoding.ASCII.GetBytes(_lastTicks[symbol].Volume);
+                        //public DateTime Time => DateTime.FromBinary(time);
+                        Console.WriteLine(symbol + " - " + type + " - " + _lastTicks[symbol].Price + " - " + _lastTicks[symbol].Volume);
+                        if (type.Contains("Price"))
+                        {
+                            Console.WriteLine("Return Price");
+                            return Price;
+                        } else
+                        //if (type == "Volume")
+                        {
+                            Console.WriteLine("Return Volume");
+                            return Volume;
+                        }
+                        //return Price;
+                        //return System.Text.Encoding.ASCII.GetBytes("Time=" + DateTime.Now.ToString() + "\0");                    
+                    }
                 }
+                test += 0.01f;
+                if (test > 2000) test = 1000;
+                return Encoding.ASCII.GetBytes(test.ToString());
                 return null;
             }
 

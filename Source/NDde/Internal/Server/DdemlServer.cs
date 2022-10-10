@@ -215,7 +215,8 @@ internal abstract class DdemlServer : IDisposable
 
         // Post an advise notification.  This will cause an XTYP_ADVREQ transaction for each conversation.
         var result = Ddeml.DdePostAdvise(_InstanceId, topicHandle, itemHandle);
-
+        //Console.WriteLine(itemHandle);
+        //Console.WriteLine(topicHandle);
         // Free the string handles created earlier.
         Ddeml.DdeFreeStringHandle(_InstanceId, itemHandle);
         Ddeml.DdeFreeStringHandle(_InstanceId, topicHandle);

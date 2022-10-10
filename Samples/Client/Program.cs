@@ -15,7 +15,7 @@ namespace Client
             try
             {
                 // Create a client that connects to 'myapp|mytopic'. 
-                using (DdeClient client = new DdeClient("myapp", "mytopic"))
+                using (DdeClient client = new DdeClient("VNI", "Price"))
                 {
                     // Subscribe to the Disconnected event.  This event will notify the application when a conversation has been terminated.
                     client.Disconnected += OnDisconnected;
@@ -24,25 +24,25 @@ namespace Client
                     client.Connect();
 
                     // Synchronous Execute Operation
-                    client.Execute("mycommand", 60000);
+                    //client.Execute("mycommand", 60000);
 
                     // Synchronous Poke Operation
-                    client.Poke("myitem", DateTime.Now.ToString(), 60000);
+                    //client.Poke("myitem", DateTime.Now.ToString(), 60000);
 
                     // Syncronous Request Operation
-                    Console.WriteLine("Request: " + client.Request("myitem", 60000));
+                    Console.WriteLine("Request: " + client.Request("VN30", 60000));
 
-                    // Asynchronous Execute Operation
-                    client.BeginExecute("mycommand", OnExecuteComplete, client);
+                    //// Asynchronous Execute Operation
+                    //client.BeginExecute("mycommand", OnExecuteComplete, client);
 
                     // Asynchronous Poke Operation
-                    client.BeginPoke("myitem", Encoding.ASCII.GetBytes(DateTime.Now.ToString() + "\0"), 1, OnPokeComplete, client);
+                    //client.BeginPoke("myitem", Encoding.ASCII.GetBytes(DateTime.Now.ToString() + "\0"), 1, OnPokeComplete, client);
 
                     // Asynchronous Request Operation
-                    client.BeginRequest("myitem", 1, OnRequestComplete, client);
+                    //client.BeginRequest("myitem", 1, OnRequestComplete, client);
 
                     // Advise Loop
-                    client.StartAdvise("myitem", 1, true, 60000);
+                    client.StartAdvise("Price", 1, true, 60000);
                     client.Advise += OnAdvise;
 
                     // Wait for the user to press ENTER before proceding.
